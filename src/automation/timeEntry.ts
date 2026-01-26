@@ -36,69 +36,108 @@ function normalizeText(text: string): string {
 }
 
 /**
- * Select an option from a dropdown by visible text
- * Handles Achievo's &nbsp; in option labels
+ * Find the option value matching the given text in a dropdown.
+ * Returns the option value string, or null if not found.
  */
-async function selectByText(frame: Frame, selector: string, text: string): Promise<boolean> {
+async function findOptionValue(frame: Frame, selector: string, text: string): Promise<string | null> {
   const select = frame.locator(selector);
 
   if ((await select.count()) === 0) {
     console.warn(`  ⚠ Dropdown not found: ${selector}`);
-    return false;
+    return null;
   }
 
   const options = await select.locator("option").all();
   const searchText = normalizeText(text).toLowerCase();
-  const optionTexts: string[] = [];
 
+  // Collect all options with their normalized text and value
+  const parsed: { normalized: string; value: string }[] = [];
   for (const option of options) {
     const rawText = await option.textContent();
-    if (rawText) {
-      const normalized = normalizeText(rawText);
-      optionTexts.push(normalized);
-      if (normalized.toLowerCase().includes(searchText)) {
-        const value = await option.getAttribute("value");
-        if (value) {
-          await select.selectOption(value);
-          return true;
-        }
-      }
+    const value = await option.getAttribute("value");
+    if (rawText && value) {
+      parsed.push({ normalized: normalizeText(rawText), value });
     }
   }
 
-  console.warn(`  ⚠ Could not find option containing "${text}"`);
-  console.warn(`    Available: ${optionTexts.join(", ")}`);
+  // 1. Try exact match first
+  for (const opt of parsed) {
+    if (opt.normalized.toLowerCase() === searchText) {
+      console.log(`    ${selector}: "${opt.normalized}" (exact match)`);
+      return opt.value;
+    }
+  }
+
+  // 2. Fall back to substring match
+  for (const opt of parsed) {
+    if (opt.normalized.toLowerCase().includes(searchText)) {
+      console.log(`    ${selector}: "${opt.normalized}" (substring match for "${text}")`);
+      return opt.value;
+    }
+  }
+
+  console.warn(`  ⚠ Could not find option matching "${text}"`);
+  console.warn(`    Available: ${parsed.map((o) => o.normalized).join(", ")}`);
+  return null;
+}
+
+/**
+ * Select an option from a dropdown by visible text
+ * Handles Achievo's &nbsp; in option labels
+ */
+async function selectByText(frame: Frame, selector: string, text: string): Promise<boolean> {
+  const value = await findOptionValue(frame, selector, text);
+  if (value) {
+    await frame.locator(selector).selectOption(value);
+    return true;
+  }
   return false;
 }
 
 /**
- * Select a dropdown and wait for page reload (cascading dropdowns)
- * Achievo reloads the page when project/phase changes
+ * Set a select dropdown's value without firing any events.
+ * Used to restore a value after a page reload resets it.
+ */
+async function selectSilently(frame: Frame, selector: string, value: string): Promise<void> {
+  await frame.locator(selector).evaluate(
+    (el, val) => { (el as any).value = val; },
+    value
+  );
+}
+
+/**
+ * Select a dropdown and wait for page reload (cascading dropdowns).
+ * Achievo reloads the page when project/phase changes via onchange handlers.
+ *
+ * Uses evaluate() to set the value silently (no events), then dispatches
+ * the change event inside a waitForNavigation so we properly catch the reload.
  */
 async function selectAndWaitForReload(
   page: Page,
   frame: Frame,
   selector: string,
   text: string
-): Promise<Frame> {
-  const selected = await selectByText(frame, selector, text);
+): Promise<{ frame: Frame; value: string | null }> {
+  const value = await findOptionValue(frame, selector, text);
 
-  if (selected) {
-    // Trigger the onchange handler by dispatching a change event
-    await frame.locator(selector).dispatchEvent("change");
+  if (value) {
+    // Set value silently first (no events)
+    await selectSilently(frame, selector, value);
 
-    // Wait for page reload from the onchange handler
+    // Trigger onChange and wait for the resulting navigation
     try {
-      await page.waitForLoadState("networkidle", { timeout: 5000 });
+      await Promise.all([
+        page.waitForNavigation({ waitUntil: "networkidle", timeout: 5000 }),
+        frame.locator(selector).dispatchEvent("change"),
+      ]);
     } catch {
       // Timeout is ok - page may not reload for every selection
     }
 
-    // Re-get frame after potential reload
-    return getContentFrame(page);
+    return { frame: await getContentFrame(page), value };
   }
 
-  return frame;
+  return { frame, value: null };
 }
 
 /**
@@ -134,10 +173,17 @@ async function fillTimeEntryForm(page: Page, frame: Frame, entry: AggregatedEntr
   await setDate(frame, entry.date);
 
   // Select project (triggers phase reload via onchange)
-  frame = await selectAndWaitForReload(page, frame, 'select#projectid', entry.projekt);
+  const projectResult = await selectAndWaitForReload(page, frame, 'select#projectid', entry.projekt);
+  frame = projectResult.frame;
 
   // Select phase (triggers activity reload via onchange)
-  frame = await selectAndWaitForReload(page, frame, 'select#phaseid', entry.phase);
+  const phaseResult = await selectAndWaitForReload(page, frame, 'select#phaseid', entry.phase);
+  frame = phaseResult.frame;
+
+  // Re-set phase silently — the reload from phase onChange may have reset the dropdown
+  if (phaseResult.value) {
+    await selectSilently(frame, 'select#phaseid', phaseResult.value);
+  }
 
   // Select activity (no reload)
   await selectByText(frame, 'select#activityid', entry.aktivität);
