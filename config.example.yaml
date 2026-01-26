@@ -1,0 +1,42 @@
+# Auto-Achievo Configuration
+# Copy this file to config.yaml and customize for your setup
+
+# Achievo instance URL
+url: "https://your-achievo-instance.com"
+
+# Project mappings
+# Each timewarrior tag maps to a project with its own phase and activity mappings
+project:
+  # Example: EMT project
+  "+emt":
+    name: "EEA: European Energy Award"
+    phase:
+      "+phase-help": "EMT Helpdesk"
+      "+phase-dev": "Development"
+      default: "EMT2 Core"
+    activity:
+      "@meeting": "Meeting"
+      "+coding": "Programmierung"
+      "+review": "Code Review"
+      default: "Standard"
+
+  # Example: Support project
+  "+support":
+    name: "Support: Kundensupport"
+    phase:
+      default: "Support"
+    activity:
+      "@meeting": "Meeting"
+      "+call": "Telefonat"
+      "+email": "E-Mail"
+      default: "Support"
+
+  # Default project when no tag matches
+  default:
+    name: "Int: Interne Aufgaben"
+    phase:
+      default: "Allgemein"
+    activity:
+      "@meeting": "Meeting"
+      "@training": "Weiterbildung"
+      default: "Sonstiges"
