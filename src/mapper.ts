@@ -17,6 +17,9 @@ export async function loadConfig(configPath: string): Promise<Config> {
     throw new Error("Config missing required field: project");
   }
 
+  // Set defaults
+  config.roundingInterval = config.roundingInterval ?? 15;
+
   return config;
 }
 

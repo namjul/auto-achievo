@@ -57,8 +57,8 @@ async function main() {
       console.warn("");
     }
 
-    // Prepare entries (round to 15 min, build comments)
-    const prepared = prepareEntries(mappedEntries);
+    // Prepare entries (smart rounding per project, build comments)
+    const prepared = prepareEntries(mappedEntries, config.roundingInterval);
 
     // Print summary
     printSummary(prepared);

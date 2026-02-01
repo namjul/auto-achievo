@@ -4,6 +4,11 @@
 # Achievo instance URL
 url: "https://your-achievo-instance.com"
 
+# Rounding interval in minutes (default: 15)
+# Time entries are rounded to the nearest interval, with smart adjustment
+# to ensure project totals stay as close as possible to actual time
+roundingInterval: 15
+
 # Project mappings
 # Each timewarrior tag maps to a project with its own phase and activity mappings
 project:

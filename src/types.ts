@@ -58,6 +58,7 @@ export interface ProjectConfig {
  */
 export interface Config {
   url: string;
+  roundingInterval: number; // in minutes, default 15
   project: {
     [tag: string]: ProjectConfig;
   };

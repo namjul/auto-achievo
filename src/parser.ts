@@ -71,6 +71,12 @@ export function parseTimewarrior(input: string): TimewarriorEntry[] {
 
     const id = idMatch[1];
 
+    // Check if this is an active entry (has "-" instead of end time)
+    if (/\d{1,2}:\d{2}:\d{2}\s+-\s+\d{1,2}:\d{2}:\d{2}/.test(line)) {
+      console.error(`Error: Entry @${id} is still running. Stop the timer before syncing.`);
+      process.exit(1);
+    }
+
     // Find all time patterns (H:MM:SS or HH:MM:SS) in the line
     const timePattern = /\d{1,2}:\d{2}:\d{2}/g;
     const times: string[] = [];
