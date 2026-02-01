@@ -26,18 +26,27 @@ export async function loadConfig(configPath: string): Promise<Config> {
 /**
  * Find a matching project config for a set of tags
  * Returns the project config and the tag that matched
+ * Throws if multiple projects match or no project is found
  */
-function findProject(tags: string[], projectMap: Config["project"]): { config: ProjectConfig | null; usedTag: string | null } {
+function findProject(tags: string[], projectMap: Config["project"]): { config: ProjectConfig; usedTag: string } {
+  const matchingProjects: { tag: string; config: ProjectConfig }[] = [];
+
   for (const tag of tags) {
     if (projectMap[tag]) {
-      return { config: projectMap[tag], usedTag: tag };
+      matchingProjects.push({ tag, config: projectMap[tag] });
     }
   }
-  // Check for default project
-  if (projectMap.default) {
-    return { config: projectMap.default, usedTag: null };
+
+  if (matchingProjects.length > 1) {
+    const projectNames = matchingProjects.map((p) => `${p.tag} (${p.config.name})`).join(", ");
+    throw new Error(`Entry has multiple project tags: ${projectNames}. Tags: ${tags.join(", ")}`);
   }
-  return { config: null, usedTag: null };
+
+  if (matchingProjects.length === 0) {
+    throw new Error(`Entry has no project tag. Use +internal for internal work. Tags: ${tags.join(", ")}`);
+  }
+
+  return { config: matchingProjects[0].config, usedTag: matchingProjects[0].tag };
 }
 
 /**
@@ -57,23 +66,8 @@ function findMapping(tags: string[], mapping: TagMapping): { value: string; used
  * Map a single timewarrior entry to Achievo fields
  */
 export function mapEntry(entry: TimewarriorEntry, config: Config): MappedEntry {
-  // Find matching project
+  // Find matching project (throws if none or multiple found)
   const projectResult = findProject(entry.tags, config.project);
-
-  if (!projectResult.config) {
-    // No project matched - return with empty values
-    return {
-      date: entry.date,
-      projekt: "",
-      phase: "",
-      aktivität: "",
-      duration: entry.duration,
-      annotation: entry.annotation,
-      originalTags: entry.tags,
-      unusedTags: entry.tags.filter((tag) => !tag.startsWith("@")),
-    };
-  }
-
   const projectConfig = projectResult.config;
 
   // Find phase and activity within project context
@@ -94,8 +88,11 @@ export function mapEntry(entry: TimewarriorEntry, config: Config): MappedEntry {
   return {
     date: entry.date,
     projekt: projectConfig.name,
+    projektTag: projectResult.usedTag,
     phase: phaseResult.value,
+    phaseTag: phaseResult.usedTag,
     aktivität: activityResult.value,
+    aktivitätTag: activityResult.usedTag,
     duration: entry.duration,
     annotation: entry.annotation,
     originalTags: entry.tags,

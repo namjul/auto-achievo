@@ -144,8 +144,11 @@ export function prepareEntries(
       return {
         date: entry.date,
         projekt: entry.projekt,
+        projektTag: entry.projektTag,
         phase: entry.phase,
+        phaseTag: entry.phaseTag,
         aktivität: entry.aktivität,
+        aktivitätTag: entry.aktivitätTag,
         duration: roundedDurations[i],
         comments: commentParts.join("; "),
       };
@@ -176,11 +179,15 @@ export function printSummary(entries: AggregatedEntry[]): void {
     dailyTotal += entry.duration;
     grandTotal += entry.duration;
 
+    const projektDisplay = `${entry.projekt} (${entry.projektTag})`;
+    const phaseDisplay = entry.phaseTag ? `${entry.phase} (${entry.phaseTag})` : entry.phase;
+    const aktivitätDisplay = entry.aktivitätTag ? `${entry.aktivität} (${entry.aktivitätTag})` : entry.aktivität;
+
     const parts = [
       formatDuration(entry.duration),
-      entry.projekt,
-      entry.phase,
-      entry.aktivität,
+      projektDisplay,
+      phaseDisplay,
+      aktivitätDisplay,
       entry.comments || "",
     ].filter(Boolean);
     console.log(`  ${parts.join(" | ")}`);

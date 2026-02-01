@@ -17,8 +17,11 @@ export interface TimewarriorEntry {
 export interface MappedEntry {
   date: string;
   projekt: string;
+  projektTag: string; // Tag that mapped to projekt
   phase: string;
+  phaseTag: string | null; // Tag that mapped to phase (null if default)
   aktivität: string;
+  aktivitätTag: string | null; // Tag that mapped to aktivität (null if default)
   duration: number; // in minutes
   annotation: string;
   originalTags: string[];
@@ -31,8 +34,11 @@ export interface MappedEntry {
 export interface AggregatedEntry {
   date: string;
   projekt: string;
+  projektTag: string;
   phase: string;
+  phaseTag: string | null;
   aktivität: string;
+  aktivitätTag: string | null;
   duration: number; // in minutes, rounded to 15-min increments
   comments: string; // Combined annotations and unused tags
 }
@@ -70,6 +76,6 @@ export interface Config {
 export interface CliOptions {
   file?: string;
   dryRun: boolean;
-  visible: boolean;
+  headless: boolean;
   config: string;
 }

@@ -16,7 +16,7 @@ async function main() {
     .option("-f, --file <path>", "Read timewarrior data from file instead of stdin")
     .option("-c, --config <path>", "Path to config file", "config.yaml")
     .option("-d, --dry-run", "Show what would be entered without making changes", false)
-    .option("-v, --visible", "Show browser window (non-headless mode)", false)
+    .option("-H, --headless", "Run browser in headless mode (no window)", false)
     .parse(process.argv);
 
   const options = program.opts<CliOptions>();
@@ -89,7 +89,7 @@ async function main() {
     }
 
     // Start browser automation
-    const session = await login(config.url, !options.visible);
+    const session = await login(config.url, options.headless);
 
     try {
       // Enter all time entries
