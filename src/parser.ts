@@ -99,7 +99,7 @@ export function parseTimewarrior(input: string): TimewarriorEntry[] {
       const lastTime = parseDuration(times[times.length - 1]);
       const secondLastTime = parseDuration(times[times.length - 2]);
 
-      if (lastTime > secondLastTime) {
+      if (lastTime >= secondLastTime) {
         // Last is Total, second-to-last is Time
         start = times[times.length - 4];
         end = times[times.length - 3];
@@ -122,12 +122,20 @@ export function parseTimewarrior(input: string): TimewarriorEntry[] {
     const firstTimePos = line.indexOf(start);
     const middleText = line.substring(idEndPos, firstTimePos).trim();
 
-    // Split middle text into tags and annotation
-    // Tags are comma-separated items starting with + or @
-    // Annotation is everything after the last tag
-    const parts = middleText.split(/\s{2,}/); // Split on 2+ spaces
-    let tagsStr = parts[0] || "";
-    let annotation = parts.slice(1).join(" ").trim();
+    // Split middle text into tags and annotation.
+    // Tags are comma-separated tokens starting with + or @.
+    // Annotation is anything after the final tag token (even with only 1 space).
+    const tagPattern = /^((?:[+@]\S+\s*,\s*)*[+@]\S+)\s*/;
+    const tagMatch = middleText.match(tagPattern);
+    let tagsStr: string;
+    let annotation: string;
+    if (tagMatch) {
+      tagsStr = tagMatch[1];
+      annotation = middleText.substring(tagMatch[0].length).trim();
+    } else {
+      tagsStr = "";
+      annotation = middleText;
+    }
 
     entries.push({
       date: currentDate,
