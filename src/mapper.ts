@@ -26,12 +26,13 @@ export async function loadConfig(configPath: string): Promise<Config> {
 /**
  * Find a matching project config for a set of tags
  * Returns the project config and the tag that matched
- * Throws if multiple projects match or no project is found
+ * Returns null if no project is found
+ * Throws if multiple projects match
  */
-function findProject(tags: string[], projectMap: Config["project"]): { config: ProjectConfig; usedTag: string } {
+function findProject(entry: TimewarriorEntry, projectMap: Config["project"]): { config: ProjectConfig; usedTag: string } | null {
   const matchingProjects: { tag: string; config: ProjectConfig }[] = [];
 
-  for (const tag of tags) {
+  for (const tag of entry.tags) {
     if (projectMap[tag]) {
       matchingProjects.push({ tag, config: projectMap[tag] });
     }
@@ -39,11 +40,12 @@ function findProject(tags: string[], projectMap: Config["project"]): { config: P
 
   if (matchingProjects.length > 1) {
     const projectNames = matchingProjects.map((p) => `${p.tag} (${p.config.name})`).join(", ");
-    throw new Error(`Entry has multiple project tags: ${projectNames}. Tags: ${tags.join(", ")}`);
+    const annotationText = entry.annotation ? ` - "${entry.annotation}"` : '';
+    throw new Error(`Entry ${entry.id} on ${entry.date}${annotationText} has multiple project tags: ${projectNames}. Tags: ${entry.tags.join(", ")}`);
   }
 
   if (matchingProjects.length === 0) {
-    throw new Error(`Entry has no project tag. Use +internal for internal work. Tags: ${tags.join(", ")}`);
+    return null;
   }
 
   return { config: matchingProjects[0].config, usedTag: matchingProjects[0].tag };
@@ -64,10 +66,14 @@ function findMapping(tags: string[], mapping: TagMapping): { value: string; used
 
 /**
  * Map a single timewarrior entry to Achievo fields
+ * Returns null if entry has no project tag
  */
-export function mapEntry(entry: TimewarriorEntry, config: Config): MappedEntry {
-  // Find matching project (throws if none or multiple found)
-  const projectResult = findProject(entry.tags, config.project);
+export function mapEntry(entry: TimewarriorEntry, config: Config): MappedEntry | null {
+  // Find matching project (returns null if none found, throws if multiple found)
+  const projectResult = findProject(entry, config.project);
+  if (!projectResult) {
+    return null;
+  }
   const projectConfig = projectResult.config;
 
   // Find phase and activity within project context
@@ -102,7 +108,21 @@ export function mapEntry(entry: TimewarriorEntry, config: Config): MappedEntry {
 
 /**
  * Map all timewarrior entries to Achievo fields
+ * Filters out entries without project tags
+ * Returns both mapped entries and skipped entries for display
  */
-export function mapEntries(entries: TimewarriorEntry[], config: Config): MappedEntry[] {
-  return entries.map((entry) => mapEntry(entry, config));
+export function mapEntries(entries: TimewarriorEntry[], config: Config): { mapped: MappedEntry[]; skipped: TimewarriorEntry[] } {
+  const mapped: MappedEntry[] = [];
+  const skipped: TimewarriorEntry[] = [];
+
+  for (const entry of entries) {
+    const result = mapEntry(entry, config);
+    if (result) {
+      mapped.push(result);
+    } else {
+      skipped.push(entry);
+    }
+  }
+
+  return { mapped, skipped };
 }

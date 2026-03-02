@@ -40,7 +40,14 @@ async function main() {
     }
 
     // Map to Achievo fields
-    const mappedEntries = mapEntries(entries, config);
+    const { mapped: mappedEntries, skipped } = mapEntries(entries, config);
+
+    // Show filtering summary first
+    if (skipped.length > 0) {
+      console.log(`Processing ${mappedEntries.length} of ${entries.length} entries (${skipped.length} filtered out)`);
+    } else {
+      console.log(`Processing ${mappedEntries.length} entries`);
+    }
 
     // Check for unmapped entries
     const unmapped = mappedEntries.filter(
@@ -62,6 +69,16 @@ async function main() {
 
     // Print summary
     printSummary(prepared);
+
+    // Display hints for skipped entries after time entry summary
+    if (skipped.length > 0) {
+      console.warn(`\n⚠ Warning: Skipped ${skipped.length} ${skipped.length === 1 ? 'entry' : 'entries'} without project tags:`);
+      for (const entry of skipped) {
+        const annotationText = entry.annotation ? ` - "${entry.annotation}"` : '';
+        console.warn(`  ${entry.id} on ${entry.date}${annotationText} - Tags: ${entry.tags.join(", ")}`);
+      }
+      console.warn(`Hint: Use +internal for internal work, or add a project tag to your config.yaml\n`);
+    }
 
     // If dry run, stop here
     if (options.dryRun) {
