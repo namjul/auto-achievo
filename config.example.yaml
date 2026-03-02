@@ -10,38 +10,57 @@ url: "https://your-achievo-instance.com"
 roundingInterval: 15
 
 # Project mappings
-# Each timewarrior tag maps to a project with its own phase and activity mappings
+# Each timewarrior tag maps to a project with phase-specific activities
 project:
   # Example: EMT project
   "+emt":
     name: "EEA: European Energy Award"
-    phase:
-      "+phase-help": "EMT Helpdesk"
-      "+phase-dev": "Development"
-      default: "EMT2 Core"
-    activity:
-      "@meeting": "Meeting"
-      "+coding": "Programmierung"
-      "+review": "Code Review"
-      default: "Standard"
+    phases:
+      # Phase for change requests (matched by +cr tag)
+      - name: "EMT2 Change Requests"
+        tags: ["+cr"]
+        activities:
+          "@meeting": "Meeting"
+          "+coding": "Programmierung"
+          default: "Standard"
+      
+      # Default phase (matched when no other phase tag is present)
+      - name: "EMT2 Core"
+        tags: []  # Empty tags = default phase
+        activities:
+          "@meeting": "Meeting"
+          "+coding": "Programmierung"
+          "+review": "Code Review"
+          default: "Standard"
 
-  # Example: Support project
-  "+support":
-    name: "Support: Kundensupport"
-    phase:
-      default: "Support"
-    activity:
-      "@meeting": "Meeting"
-      "+call": "Telefonat"
-      "+email": "E-Mail"
-      default: "Support"
-
-  # Default project when no tag matches
-  default:
+  # Example: Internal work project
+  "+internal":
     name: "Int: Interne Aufgaben"
-    phase:
-      default: "Allgemein"
-    activity:
-      "@meeting": "Meeting"
-      "@training": "Weiterbildung"
-      default: "Sonstiges"
+    phases:
+      # Meetings & Events phase (matched by @meeting or +meeting tags)
+      - name: "Meetings & Events (internal)"
+        tags: ["@meeting", "+meeting"]
+        activities:
+          "+jourfix": "Jour-Fixes"
+          default: "Meeting"
+      
+      # Training phase (matched by @training tag)
+      - name: "Fortbildung/further education"
+        tags: ["@training"]
+        activities:
+          default: "Training"
+      
+      # General work phase (default - matched when no phase tag)
+      - name: "Allgem. Tätigkeiten/general work"
+        tags: []  # Empty tags = default phase
+        activities:
+          "+zeiterfassung": "Zeiterfassung"
+          "+timetracking": "Zeiterfassung"
+          "+jourfix": "Jour-Fixes"
+          default: "Sonstige"
+
+# Notes:
+# - Each project must have exactly ONE phase with empty tags array (the default phase)
+# - Phase tags are checked first; if a tag matches, that phase is selected
+# - Within a phase, activity tags are checked; if none match, the default activity is used
+# - This ensures that each phase has contextually valid activities

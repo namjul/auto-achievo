@@ -1,26 +1,26 @@
 import { readFile } from "fs/promises";
 import { parse as parseYaml } from "yaml";
-import { Config, MappedEntry, ProjectConfig, TagMapping, TimewarriorEntry } from "./types";
+import { Config, MappedEntry, PhaseConfig, ProjectConfig, TimewarriorEntry } from "./types";
+import { ConfigSchema } from "./schema";
 
 /**
- * Load and parse configuration file
+ * Load and parse configuration file with Zod validation
  */
 export async function loadConfig(configPath: string): Promise<Config> {
   const content = await readFile(configPath, "utf-8");
-  const config = parseYaml(content) as Config;
+  const rawConfig = parseYaml(content);
 
-  // Validate required fields
-  if (!config.url) {
-    throw new Error("Config missing required field: url");
+  // Validate with Zod schema
+  const result = ConfigSchema.safeParse(rawConfig);
+  
+  if (!result.success) {
+    const errors = result.error.issues.map(
+      (err: any) => `  - ${err.path.join(".")}: ${err.message}`
+    ).join("\n");
+    throw new Error(`Invalid configuration:\n${errors}`);
   }
-  if (!config.project) {
-    throw new Error("Config missing required field: project");
-  }
 
-  // Set defaults
-  config.roundingInterval = config.roundingInterval ?? 15;
-
-  return config;
+  return result.data;
 }
 
 /**
@@ -52,16 +52,39 @@ function findProject(entry: TimewarriorEntry, projectMap: Config["project"]): { 
 }
 
 /**
- * Find the first matching value in a tag mapping
+ * Find the matching phase for a set of tags
+ * Returns the phase config and the tag that matched it
  */
-function findMapping(tags: string[], mapping: TagMapping): { value: string; usedTag: string | null } {
-  for (const tag of tags) {
-    if (mapping[tag]) {
-      return { value: mapping[tag], usedTag: tag };
+function findPhase(tags: string[], phases: PhaseConfig[]): { phase: PhaseConfig; usedTag: string | null } {
+  // First, try to find a phase by tag match
+  for (const phase of phases) {
+    for (const tag of tags) {
+      if (phase.tags.includes(tag)) {
+        return { phase, usedTag: tag };
+      }
     }
   }
-  // Return default if no tag matches
-  return { value: mapping.default || "", usedTag: null };
+  
+  // If no match, return the default phase (the one with empty tags array)
+  const defaultPhase = phases.find((p) => p.tags.length === 0);
+  if (!defaultPhase) {
+    throw new Error("No default phase found (this should be caught by Zod validation)");
+  }
+  
+  return { phase: defaultPhase, usedTag: null };
+}
+
+/**
+ * Find the matching activity within a phase
+ */
+function findActivity(tags: string[], activities: Record<string, string>): { value: string; usedTag: string | null } {
+  for (const tag of tags) {
+    if (activities[tag]) {
+      return { value: activities[tag], usedTag: tag };
+    }
+  }
+  // Return default activity
+  return { value: activities.default || "", usedTag: null };
 }
 
 /**
@@ -76,9 +99,11 @@ export function mapEntry(entry: TimewarriorEntry, config: Config): MappedEntry |
   }
   const projectConfig = projectResult.config;
 
-  // Find phase and activity within project context
-  const phaseResult = findMapping(entry.tags, projectConfig.phase);
-  const activityResult = findMapping(entry.tags, projectConfig.activity);
+  // Find phase first (phase determines available activities)
+  const phaseResult = findPhase(entry.tags, projectConfig.phases);
+  
+  // Find activity within the selected phase's context
+  const activityResult = findActivity(entry.tags, phaseResult.phase.activities);
 
   // Collect tags that were used for mapping
   const usedTags = new Set<string>();
@@ -95,7 +120,7 @@ export function mapEntry(entry: TimewarriorEntry, config: Config): MappedEntry |
     date: entry.date,
     projekt: projectConfig.name,
     projektTag: projectResult.usedTag,
-    phase: phaseResult.value,
+    phase: phaseResult.phase.name,
     phaseTag: phaseResult.usedTag,
     aktivität: activityResult.value,
     aktivitätTag: activityResult.usedTag,

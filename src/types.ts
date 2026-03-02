@@ -44,31 +44,9 @@ export interface AggregatedEntry {
 }
 
 /**
- * Mapping configuration for tags to values
+ * Configuration types (imported from schema.ts for validation)
  */
-export interface TagMapping {
-  [tag: string]: string;
-}
-
-/**
- * Project-specific configuration
- */
-export interface ProjectConfig {
-  name: string;
-  phase: TagMapping;
-  activity: TagMapping;
-}
-
-/**
- * Full configuration file structure
- */
-export interface Config {
-  url: string;
-  roundingInterval: number; // in minutes, default 15
-  project: {
-    [tag: string]: ProjectConfig;
-  };
-}
+export type { TagMapping, PhaseConfig, ProjectConfig, Config } from "./schema";
 
 /**
  * CLI options
